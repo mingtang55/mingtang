@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>名堂 · 起名神器</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #f5f0e8; font-family: system-ui, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .header { text-align: center; padding: 24px 0 20px; }
+        .logo { font-size: 42px; font-weight: 600; color: #3a2c1f; }
+        .slogan { font-size: 14px; color: #8b7355; }
+        .card { background: white; border-radius: 32px; padding: 24px; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+        textarea { width: 100%; padding: 14px; border-radius: 24px; border: 1px solid #e0d6cc; font-size: 15px; background: #fffef8; resize: vertical; }
+        .button-group { display: flex; gap: 12px; margin: 16px 0; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 40px; font-size: 16px; font-weight: 500; cursor: pointer; background: #3a2c1f; color: white; }
+        .btn-secondary { background: #e8e0d5; color: #3a2c1f; }
+        .names-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin: 20px 0; }
+        .name-item { background: #faf7f2; padding: 8px 12px; border-radius: 30px; text-align: center; font-size: 14px; border: 1px solid #efe5db; }
+        .pay-btn { background: #d4a373; margin-top: 16px; width: 100%; padding: 12px; border-radius: 40px; }
+        .btn-copy { background: #e8e0d5; color: #3a2c1f; width: 100%; padding: 12px; margin-top: 16px; border-radius: 40px; }
+        .loading { text-align: center; padding: 40px; color: #8b7355; }
+        .hot-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+        .hot-tag { background: white; padding: 6px 16px; border-radius: 30px; font-size: 13px; border: 1px solid #e0d6cc; cursor: pointer; }
+        .footer { text-align: center; font-size: 12px; color: #a6947e; margin-top: 20px; }
+        .pay-box { text-align: center; margin-top: 20px; background: #f5efe8; border-radius: 20px; padding: 16px; }
+        .pay-tip { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
+        .qrcode-img { width: 180px; margin: 12px auto; display: block; border-radius: 12px; }
+        .small-hint { font-size: 12px; color: #8b7355; margin-top: 8px; }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #3a2c1f; color: white; padding: 10px 20px; border-radius: 40px; font-size: 14px; z-index: 1000; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header"><div class="logo">名·堂</div><div class="slogan">让你的名字，有点名堂</div></div>
+    <div class="card">
+        <textarea id="demandInput" rows="2" placeholder="例如：古风女生网名 清冷温柔"></textarea>
+        <div class="button-group">
+            <button id="randomBtn" class="btn-secondary">🎲 随便看看</button>
+            <button id="generateBtn">✨ 生成名字</button>
+        </div>
+        <div id="resultArea"><div style="text-align:center;color:#b89a6e;padding:30px;">输入需求，点击生成 ✨</div></div>
+    </div>
+    <div class="card">
+        <div style="font-weight:500;">🔥 热门推荐</div>
+        <div class="hot-list" id="hotList">
+            <span class="hot-tag" data-demand="古风女生网名 清冷 温柔">古风女生</span>
+            <span class="hot-tag" data-demand="游戏ID 霸气 高冷 两个字">游戏ID霸气</span>
+            <span class="hot-tag" data-demand="文艺网名 安静 书卷气">文艺网名</span>
+            <span class="hot-tag" data-demand="男宝宝名字 阳光 有寓意">男宝宝名</span>
+        </div>
+    </div>
+    <div class="footer">本服务由AI生成，仅供参考 · 每个名字都有它的名堂</div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+    let currentNames = [];
+    let isPaid = false;
+    let isLoading = false;
+
+    const demandInput = document.getElementById('demandInput');
+    const generateBtn = document.getElementById('generateBtn');
+    const randomBtn = document.getElementById('randomBtn');
+    const resultArea = document.getElementById('resultArea');
+    const toastEl = document.getElementById('toast');
+
+    function showToast(msg, duration = 2000) {
+        toastEl.textContent = msg;
+        toastEl.style.opacity = '1';
+        setTimeout(() => { toastEl.style.opacity = '0'; }, duration);
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    function checkUnlockStatus() {
+        const unlocked = localStorage.getItem('mingtang_unlocked');
+        if (unlocked === 'true') {
+            isPaid = true;
+            if (currentNames.length > 0) {
+                renderNames(false);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    function permanentUnlock() {
+        localStorage.setItem('mingtang_unlocked', 'true');
+        isPaid = true;
+    }
+
+    function getMockNames() {
+        const pool = ['清风徐来', '月下独酌', '南风知意', '晚风吻尽', '故里逢春', '墨染青衣', '听雨眠', '云深不知处', '半盏流年', '笙歌散'];
+        let result = [...pool];
+        while (result.length < 50) result = result.concat(pool);
+        return result.slice(0, 50);
+    }
+
+    function renderNames(preview = true) {
+        if (!currentNames.length) return;
+        const display = preview ? currentNames.slice(0, 5) : currentNames;
+        let html = '<div class="names-grid">';
+        for (let i = 0; i < display.length; i++) {
+            html += '<div class="name-item">' + escapeHtml(display[i]) + '</div>';
+        }
+        html += '</div>';
+        
+        if (preview) {
+            html += '<div class="pay-box">';
+            html += '<div class="pay-tip">👇 扫码支付3元，解锁全部50个名字</div>';
+            html += '<img class="qrcode-img" src="shoukuan.png" alt="收款码" onerror="this.style.display=\'none\'">';
+            html += '<div class="small-hint">支付后点击下方按钮，自动显示完整名单</div>';
+            html += '<button class="pay-btn" id="payConfirmBtn">✅ 我已支付，解锁全部</button>';
+            html += '</div>';
+        } else {
+            html += '<button class="btn-copy" id="copyBtn">📋 一键复制全部名字</button>';
+        }
+        resultArea.innerHTML = html;
+        
+        if (preview) {
+            const confirmBtn = document.getElementById('payConfirmBtn');
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', () => {
+                    const userConfirmed = confirm('✅ 请确认你已经完成扫码支付3元\n\n👉 确认后，页面会自动解锁全部名字\n（如未付款请勿点击）');
+                    if (!userConfirmed) return;
+                    const orderId = 'order_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+                    localStorage.setItem('lastPayOrder', JSON.stringify({ orderId, time: new Date().toLocaleString(), amount: 3 }));
+                    permanentUnlock();
+                    showToast('🎉 解锁成功！感谢支持～', 2000);
+                    renderNames(false);
+                });
+            }
+        } else {
+            const copyBtn = document.getElementById('copyBtn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(currentNames.join('\n'));
+                    showToast('📋 已复制 ' + currentNames.length + ' 个名字', 1500);
+                });
+            }
+        }
+    }
+
+    async function generateNames(demand) {
+        if (isLoading) return;
+        isLoading = true;
+        resultArea.innerHTML = '<div class="loading">✨ AI 正在构思...</div>';
+        try {
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ demand: demand })
+            });
+            const data = await response.json();
+            
+            if (data.success && data.names && data.names.length > 0) {
+                currentNames = data.names;
+                showToast('✅ 生成成功', 1000);
+            } else {
+                throw new Error(data.error || '生成失败');
+            }
+            
+            isPaid = false;
+            if (localStorage.getItem('mingtang_unlocked') === 'true') {
+                isPaid = true;
+                renderNames(false);
+            } else {
+                renderNames(true);
+            }
+        } catch(err) {
+            console.error(err);
+            currentNames = getMockNames();
+            showToast('⚠️ 后端连接失败，使用演示数据', 2000);
+            renderNames(true);
+        }
+        isLoading = false;
+    }
+
+    generateBtn.addEventListener('click', () => {
+        const demand = demandInput.value.trim();
+        if (!demand) { showToast('请输入起名需求', 1500); return; }
+        generateNames(demand);
+    });
+
+    randomBtn.addEventListener('click', () => {
+        const randomList = ['古风诗意网名', '霸气游戏ID', '温柔治愈昵称', '冷门高级二字名'];
+        const random = randomList[Math.floor(Math.random() * randomList.length)];
+        demandInput.value = random;
+        generateNames(random);
+    });
+
+    document.querySelectorAll('.hot-tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+            const demand = tag.getAttribute('data-demand');
+            if (demand) { demandInput.value = demand; generateNames(demand); }
+        });
+    });
+
+    checkUnlockStatus();
+</script>
+</body>
+</html>
