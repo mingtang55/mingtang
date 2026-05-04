@@ -55,8 +55,6 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    // ========== 纯前端版本，API Key 在后端 server.js 里 ==========
-    
     let currentNames = [];
     let isPaid = false;
     let isLoading = false;
@@ -152,13 +150,12 @@
         }
     }
 
-    // ✅ 核心：调用后端（API Key 在 server.js 里，前端完全不接触）
     async function generateNames(demand) {
         if (isLoading) return;
         isLoading = true;
         resultArea.innerHTML = '<div class="loading">✨ AI 正在构思...</div>';
         try {
-            const response = await fetch('http://localhost:3000/api/generate', {
+            const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ demand: demand })
